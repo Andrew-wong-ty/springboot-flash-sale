@@ -30,7 +30,7 @@ public class SecondKillController {
     private IOrderService orderService;
 
     @RequestMapping("/doSecondKill")
-    public String doSecKill(Model model, User user, long goodsId, HttpServletRequest request) {
+    public String doSecKill(Model model, User user, long goodsId) {
         if(user==null) return "login";
         model.addAttribute("user", user);
         //获取用户要抢购的商品

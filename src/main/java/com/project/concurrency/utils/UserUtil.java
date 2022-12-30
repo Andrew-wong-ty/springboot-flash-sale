@@ -97,13 +97,13 @@ public class UserUtil {
     private static Connection getConnection() throws ClassNotFoundException, SQLException {
         String url = "jdbc:mysql://localhost:3306/concurrency?serverTimezone=Asia/Shanghai&characterEncoding=utf8&useUnicode=true&useSSL=false";
         String username = "root";
-        String password = "";
+        String password = "wang161301";
         String driver = "com.mysql.cj.jdbc.Driver";
         Class.forName(driver); // 查找并加载这个类
         return DriverManager.getConnection(url,username,password);
     }
 
     public static void main(String[] args) throws SQLException, IOException, ClassNotFoundException {
-        createUser(3);
+        createUser(5000);
     }
 }
