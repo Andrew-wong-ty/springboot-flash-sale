@@ -6,18 +6,24 @@ import com.project.concurrency.service.IGoodsService;
 import com.project.concurrency.service.IUserService;
 import com.project.concurrency.service.impl.UserServiceImpl;
 import com.project.concurrency.utils.vo.GoodsVo;
+import io.netty.util.internal.StringUtil;
 import org.springframework.boot.web.servlet.server.Session;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.CookieValue;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
+import org.thymeleaf.context.IWebContext;
+import org.thymeleaf.context.WebContext;
+import org.thymeleaf.spring5.view.ThymeleafViewResolver;
+import org.thymeleaf.util.StringUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import java.util.Date;
+import java.util.concurrent.TimeUnit;
 
 @Controller
 @RequestMapping("/goods")
@@ -26,6 +32,11 @@ public class GoodsController {
     private IUserService userService;
     @Resource
     private IGoodsService goodsService;
+    @Resource
+    // 引入 redis
+    private RedisTemplate redisTemplate;
+    @Resource
+    private ThymeleafViewResolver thymeleafViewResolver; // 用于手动渲染thymeleaf
 
 //    @RequestMapping("/toList")
 //    public String toList(HttpServletRequest request, HttpServletResponse response, Model model, @CookieValue("userTicket") String ticket){
@@ -38,20 +49,71 @@ public class GoodsController {
 //        model.addAttribute("user",user);
 //        return "goodsList";
 //    }
-    @RequestMapping("/toList")
-    public String toList(Model model, User user){
+//    @RequestMapping("/toList")
+//    public String toList(Model model, User user){
+//        /*以下可以省略*/
+//        if(user==null) return "login";
+//        /*以上*/
+//        model.addAttribute("user",user);
+//        model.addAttribute("goodsList",goodsService.findGoodsVo());
+//        return "goodsList";
+//    }
+
+    /**
+     * user对象是自动根据cookie来获取的
+     * @param model
+     * @param user
+     * @return
+     */
+    @RequestMapping(value = "/toList", produces = "text/html;charset=utf-8")
+    @ResponseBody
+    public String toList(Model model, User user,
+                         HttpServletRequest request, HttpServletResponse response
+        ){
         /*以下可以省略*/
         if(user==null) return "login";
         /*以上*/
+
+        // 在redis中尝试读取页面缓存 START1
+        ValueOperations valueOperations = redisTemplate.opsForValue();
+        String html = (String) valueOperations.get("goodsList");
+        if (!StringUtils.isEmpty(html)){
+            return html;
+        }
+        // 在redis中尝试读取页面缓存 END1
+
+
         model.addAttribute("user",user);
-        model.addAttribute("goodsList",goodsService.findGoodsVo());
-        return "goodsList";
+        model.addAttribute("goodsList",goodsService.findGoodsVo());  //??
+//        return "goodsList"; // 不单只做页面跳转
+
+        // 手动渲染, 并写入redis缓存 START
+        IWebContext iWebContext = new WebContext(request, response, request.getServletContext(), request.getLocale(),model.asMap());
+        html = thymeleafViewResolver.getTemplateEngine().process("goodsList",iWebContext);
+        if(!StringUtils.isEmpty(html)){
+            // html不为空, 则把html写入到redis中
+            valueOperations.set("goodsList",html,60, TimeUnit.SECONDS);
+        }
+        return html;
+        // 手动渲染, 并写入redis缓存 END
     }
 
-    @RequestMapping("/toDetail/{goodsID}")
-    public String toDetail(Model model, User user, @PathVariable long goodsID){
-        model.addAttribute("user",user);
+    @RequestMapping(value="/toDetail/{goodsID}", produces = "text/html;charset=utf-8")
+    @ResponseBody
+    public String toDetail(Model model, User user, @PathVariable long goodsID,
+                           HttpServletRequest request, HttpServletResponse response
+    ){
+        ValueOperations valueOperations = redisTemplate.opsForValue(); // 用于进行HTML操作
 
+        // 在redis中尝试读取页面缓存 START
+        String html = (String) valueOperations.get("goodsDetail"+goodsID);
+        if(!StringUtils.isEmpty(html)){
+            //若html非空, 则说明有提前缓存
+            return html;
+        }
+        // 在redis中尝试读取页面缓存 END
+
+        model.addAttribute("user",user);
         /*获取goodsVo, 然后从后端获取当前时间*/
         GoodsVo goodsVo = goodsService.findGoodsVoByGoodsId(goodsID);
         Date startDate = goodsVo.getStartDate();
@@ -76,7 +138,47 @@ public class GoodsController {
         model.addAttribute("secKillStatus",secKillStatus);
         model.addAttribute("remainSeconds",remainSeconds);
 
-        return "goodsDetail";
+        // 手动渲染, 并写入redis缓存 START
+        IWebContext iWebContext = new WebContext(request, response, request.getServletContext(), request.getLocale(),model.asMap());
+        html = thymeleafViewResolver.getTemplateEngine().process("goodsDetail",iWebContext);
+        if(!StringUtils.isEmpty(html)){
+            // html不为空, 则把html写入到redis中
+            valueOperations.set("goodsDetail"+goodsID,html,60, TimeUnit.SECONDS);
+        }
+        return html;
+        // 手动渲染, 并写入redis缓存 END
+
     }
+
+//    @RequestMapping("/toDetail/{goodsID}")
+//    public String toDetail(Model model, User user, @PathVariable long goodsID){
+//
+//        model.addAttribute("user",user);
+//        /*获取goodsVo, 然后从后端获取当前时间*/
+//        GoodsVo goodsVo = goodsService.findGoodsVoByGoodsId(goodsID);
+//        Date startDate = goodsVo.getStartDate();
+//        Date endDate = goodsVo.getEndDate();
+//        Date currentDate = new Date();
+//
+//        int secKillStatus = -1; // 表示
+//        int remainSeconds = -1; // 表示
+//        if(startDate.after(currentDate)){
+//            secKillStatus = 0; // 尚未开始
+//            remainSeconds = (int)((startDate.getTime()-currentDate.getTime())/1000);
+//        }
+//        else if(endDate.before(currentDate)){
+//            secKillStatus =  2;  // 已经结束
+//        }
+//        else{
+//            // 中间
+//            secKillStatus = 1;  // 正在进行中
+//            remainSeconds = 0;
+//        }
+//        model.addAttribute("goods", goodsVo);
+//        model.addAttribute("secKillStatus",secKillStatus);
+//        model.addAttribute("remainSeconds",remainSeconds);
+//
+//        return "goodsDetail";
+//    }
 
 }
