@@ -7,10 +7,13 @@ import com.project.concurrency.pojo.Order;
 import com.project.concurrency.pojo.SeckillGoods;
 import com.project.concurrency.pojo.SeckillOrder;
 import com.project.concurrency.pojo.User;
+import com.project.concurrency.service.IGoodsService;
 import com.project.concurrency.service.IOrderService;
 import com.project.concurrency.service.ISeckillGoodsService;
 import com.project.concurrency.service.ISeckillOrderService;
 import com.project.concurrency.utils.vo.GoodsVo;
+import com.project.concurrency.utils.vo.OrderDetailVo;
+import com.sun.org.apache.xpath.internal.operations.Or;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
@@ -32,6 +35,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private OrderMapper orderMapper; // 其实这里不规范, 这里应该调用service
     @Resource
     private ISeckillOrderService orderService;
+    @Resource
+    private IGoodsService iGoodsService;
 
     @Override
     public Order secKill(User user, GoodsVo goods) {
@@ -69,5 +74,24 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 
 
         return order;
+    }
+
+
+    /**
+     * 根据orderId来查询订单详情
+     * @param orderId
+     * @return
+     */
+    @Override
+    public OrderDetailVo detail(Long orderId) {
+        if(orderId==null){
+            throw  new RuntimeException();  // 这里要永global exceptions
+        }
+        Order order = orderMapper.selectById(orderId);
+        GoodsVo goodsVo = iGoodsService.findGoodsVoByGoodsId(order.getGoodsId());
+        OrderDetailVo orderDetailVo = new OrderDetailVo();
+        orderDetailVo.setOrder(order);
+        orderDetailVo.setGoodsVo(goodsVo);
+        return orderDetailVo;
     }
 }

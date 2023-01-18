@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.project.concurrency.pojo.Order;
 import com.project.concurrency.pojo.User;
 import com.project.concurrency.utils.vo.GoodsVo;
+import com.project.concurrency.utils.vo.OrderDetailVo;
 
 /**
  * <p>
@@ -15,4 +16,6 @@ import com.project.concurrency.utils.vo.GoodsVo;
  */
 public interface IOrderService extends IService<Order> {
     Order secKill(User user, GoodsVo goods);
+
+    OrderDetailVo detail(Long orderId);
 }
