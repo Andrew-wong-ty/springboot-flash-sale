@@ -11,6 +11,7 @@ import com.project.concurrency.service.ISeckillOrderService;
 import com.project.concurrency.utils.vo.GoodsVo;
 import com.project.concurrency.utils.vo.RespBean;
 import com.project.concurrency.utils.vo.RespBeanEnum;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,6 +32,8 @@ public class SecondKillController {
     private ISeckillOrderService seckillOrderService;
     @Resource
     private IOrderService orderService;
+    @Resource
+    private RedisTemplate redisTemplate;
     /**
      * 以下是没有静态化之前的版本
      */
@@ -93,22 +96,29 @@ public class SecondKillController {
 
         //判断库存
         if(goodsVo.getStockCount()<1){
-            model.addAttribute("errmsg", RespBeanEnum.STOCK_ERROR.getMessage());
+//            model.addAttribute("errmsg", RespBeanEnum.STOCK_ERROR.getMessage());
             return RespBean.error(RespBeanEnum.EMPTY_STOCK);
         }
 
         //判断重复抢购
-        SeckillOrder seckillOrder = seckillOrderService.getOne(
-                new QueryWrapper<SeckillOrder>()
-                        .eq("user_id", user.getId()).eq("goods_id",goodsId)
-                /*查询此用户有没有购买过这件商品*/
-        );
+//        SeckillOrder seckillOrder = seckillOrderService.getOne(
+//                new QueryWrapper<SeckillOrder>()
+//                        .eq("user_id", user.getId()).eq("goods_id",goodsId)
+//                /*查询此用户有没有购买过这件商品*/
+//        );
+//        if(seckillOrder!=null){
+//            //已经抢购过
+//            model.addAttribute("errmsg", RespBeanEnum.REPEATED_ORDER_ERROR.getMessage());
+//            return RespBean.error(RespBeanEnum.REPEAT_PURCHASE);
+//        }
+        // 优化, 使用redis判断是否重复抢购
+        SeckillOrder seckillOrder =
+                (SeckillOrder) redisTemplate.opsForValue().get("order:"+user.getId()+":"+goodsVo.getId());
         if(seckillOrder!=null){
             //已经抢购过
-            model.addAttribute("errmsg", RespBeanEnum.REPEATED_ORDER_ERROR.getMessage());
+//            model.addAttribute("errmsg", RespBeanEnum.REPEATED_ORDER_ERROR.getMessage());
             return RespBean.error(RespBeanEnum.REPEAT_PURCHASE);
         }
-
 
 
         //进行抢购, 下订单, 使用order service

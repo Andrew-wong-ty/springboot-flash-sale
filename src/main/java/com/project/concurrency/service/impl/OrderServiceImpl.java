@@ -1,6 +1,8 @@
 package com.project.concurrency.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.UpdateWrapper;
+import com.baomidou.mybatisplus.extension.conditions.update.UpdateChainWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.project.concurrency.mapper.OrderMapper;
 import com.project.concurrency.pojo.Order;
@@ -14,7 +16,9 @@ import com.project.concurrency.service.ISeckillOrderService;
 import com.project.concurrency.utils.vo.GoodsVo;
 import com.project.concurrency.utils.vo.OrderDetailVo;
 import com.sun.org.apache.xpath.internal.operations.Or;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.Date;
@@ -27,6 +31,7 @@ import java.util.Date;
  * @author zhoubin
  * @since 2022-11-15
  */
+@Transactional
 @Service
 public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements IOrderService {
     @Resource
@@ -37,6 +42,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
     private ISeckillOrderService orderService;
     @Resource
     private IGoodsService iGoodsService;
+    @Resource
+    private RedisTemplate redisTemplate;
 
     @Override
     public Order secKill(User user, GoodsVo goods) {
@@ -47,7 +54,17 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         );
         // 减库存
         seckillGoods.setStockCount(seckillGoods.getStockCount()-1);
-        goodsService.updateById(seckillGoods);
+        // 优化: 在更新库存的时候首先要判断还有没有库存, 库存>0才行
+//        goodsService.updateById(seckillGoods);
+//        boolean seckillGoodsUpdateResult = goodsService.update(new UpdateWrapper<SeckillGoods>()
+//                .set("stock_count", seckillGoods.getStockCount())
+//                .eq("id", seckillGoods.getId()).gt("stock_count", 0));
+        boolean seckillGoodsUpdateResult = goodsService.update(new UpdateWrapper<SeckillGoods>()
+                .setSql("stock_count = stock_count-1").eq("goods_id", goods.getId()).gt("stock_count", 0));
+        if(!seckillGoodsUpdateResult){
+            // 没有更新成功
+            return null;
+        }
 
         // 生成订单, 然后插入到order表
         Order order = new Order();
@@ -69,6 +86,8 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
         seckillOrder.setOrderId(order.getId());
         seckillOrder.setGoodsId(goods.getId());
         orderService.save(seckillOrder); // 插入
+        // 把订单对象放到redis缓存中, 以方便在'SeckillOrderController.java'中用于更加地快速判断同一用户是否买了多个
+        redisTemplate.opsForValue().set("order:"+user.getId()+":"+goods.getId(), seckillOrder);
 
 
 
