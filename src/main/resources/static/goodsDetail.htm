@@ -82,7 +82,8 @@
             success: function (data) {
                 console.log("goodsDetail-data: ", data)
                 if(data.code===200){
-                    window.location.href = 'orderDetail.htm?orderId='+data.object.id;
+                    // window.location.href = 'orderDetail.htm?orderId='+data.object.id;
+                    getResult($('#goodsId').val());
                 }
                 else{
                     layer.msg(data.message)
@@ -92,6 +93,51 @@
                 console.log("goodsDetail-data: ", data)
                 layer.msg("客户端请求错误")
             }
+        })
+    }
+
+    function getResult(goodsId) {
+        g_showLoading(); //展示正在加载
+        $.ajax({
+            url: '/secondSkill/result',
+            type: 'GET',
+            data: {
+                goodsId: goodsId,
+            },
+            success: function (data){
+                if(data.code===200){
+                    var result = data.object;
+                    if(result<0){
+                        layer.msg("对不起, 秒杀失败");
+                    }
+                    else if(result===0){
+                        // 正在排队
+                        // 进行轮询
+                        setTimeout(function () {
+                            getResult(goodsId);
+                        }, 100);
+                    }
+                    else {
+                        //秒杀成功
+                        layer.confirm(
+                            "恭喜你, 秒杀成功, 查看订单吗?",
+                            {btn:["确定", "取消"]},
+                            function (){
+                                // 点击确定的function
+                                window.location.href = 'orderDetail.htm?orderId='+result;
+                            },
+                            function () {
+                                // 点击取消的function
+                                layer.close();
+                            }
+                        )
+                    }
+                }
+            },
+            error: function (){
+                layer.msg("客户端请求错误");
+            }
+
         })
     }
 

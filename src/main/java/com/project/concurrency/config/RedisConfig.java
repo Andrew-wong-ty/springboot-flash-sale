@@ -2,8 +2,10 @@ package com.project.concurrency.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
@@ -31,5 +33,14 @@ public class RedisConfig {
         redisTemplate.setConnectionFactory(redisConnectionFactory);
         return redisTemplate;
 
+    }
+
+    @Bean
+    public DefaultRedisScript<Long> script(){
+        DefaultRedisScript<Long> defaultRedisScript = new DefaultRedisScript<>();
+        // lua脚本可以使得多个redis操作保持原子性
+        defaultRedisScript.setLocation(new ClassPathResource("stock.lua"));
+        defaultRedisScript.setResultType(Long.class);
+        return defaultRedisScript; // 返回库存
     }
 }

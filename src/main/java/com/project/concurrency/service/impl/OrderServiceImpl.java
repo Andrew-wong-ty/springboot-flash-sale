@@ -59,11 +59,18 @@ public class OrderServiceImpl extends ServiceImpl<OrderMapper, Order> implements
 //        boolean seckillGoodsUpdateResult = goodsService.update(new UpdateWrapper<SeckillGoods>()
 //                .set("stock_count", seckillGoods.getStockCount())
 //                .eq("id", seckillGoods.getId()).gt("stock_count", 0));
+        // 以下是原子操作
         boolean seckillGoodsUpdateResult = goodsService.update(new UpdateWrapper<SeckillGoods>()
                 .setSql("stock_count = stock_count-1").eq("goods_id", goods.getId()).gt("stock_count", 0));
         if(!seckillGoodsUpdateResult){
             // 没有更新成功
             return null;
+        }
+        if(seckillGoods.getStockCount()<1){
+            // 更新完库存之后, 已经没有库存了
+            // redis中标记已经没有库存了
+            redisTemplate.opsForValue().set("isStockEmpty:"+goods.getId(),"0");
+            //return null; //? 这里为什么要return null? 如果商品剩下一件, 用户就不能抢到了? 需要测试一下!!!
         }
 
         // 生成订单, 然后插入到order表

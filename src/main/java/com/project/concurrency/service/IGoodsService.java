@@ -15,6 +15,11 @@ import java.util.List;
  * @since 2022-11-15
  */
 public interface IGoodsService extends IService<Goods> {
+
+    /**
+     * 把所有的goods给查出来
+     * @return
+     */
     List<GoodsVo> findGoodsVo();
 
 
